@@ -1,22 +1,15 @@
-# Security notes
+# Security Policy & Threat Model
 
-## Threat model
+## Threat Model
 
-`trysac-incremental-compute-cache` is a pure library without I/O. The main risks are:
+### Defended
 
-- **Supply chain**: a compromised dependency or CI action. Mitigation: no runtime dependencies,
-  Dependabot weekly updates, actions pinned to major versions, minimal workflow permissions.
-- **Leaked secrets**: tokens committed by mistake. Mitigation: `gitleaks` runs in the local gates
-  and in CI; `.env` files are git-ignored.
-- **Insecure code**: shell injection, weak hashes, unsafe deserialization. Mitigation: Ruff's
-  `S` rules in lint and a `security` gate (Bandit, high severity fails, `# nosec` ignored); fix the
-  code instead of silencing it.
-- **Untrusted input**: callers may pass hostile strings. Mitigation: validate input and fail with
-  explicit exceptions; never `eval`, `exec` or deserialize untrusted data.
+- **Arbitrary Code Execution**: The store uses canonical type-tagged JSON instead of `pickle`. Malformed files or unknown tags immediately raise `CacheError('corrupt_store')`.
+- **Resource Exhaustion**: Call stack depth is capped (default 100), nesting depth for values is capped (64), individual serialized values are limited to `max_value_bytes`, and stores are bounded by `max_entries` with LRU eviction.
+- **Cycles**: Cyclic calls are detected via the active call stack (`CacheError('cycle')`).
+- **Data Leakage**: `Event` payloads never contain raw arguments or results, only metadata and a 12-char hex key prefix.
 
-## Publishing
+### Not Defended
 
-Releases are published to PyPI with trusted publishing (OIDC) when available, never with a
-long-lived token stored in the repository.
-
-To report a vulnerability, see [SECURITY.md](../SECURITY.md).
+- **Concurrent Writers**: `SqliteStore` assumes one writer process per database file.
+- **Global Mutation**: Mutations to external global objects are not tracked; fingerprints rely solely on bytecode and constants.

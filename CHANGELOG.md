@@ -9,4 +9,5 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Add `Graph`, `MemoryStore`, `SqliteStore`, `Store`, `Event`, and `CacheError` for incremental computation caching with bytecode fingerprinting and early cutoff.
 - Initial project structure from the factory utility template.
