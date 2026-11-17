@@ -1,48 +1,61 @@
 # incremental-compute-cache
 
-[![PyPI version](https://img.shields.io/pypi/v/trysac-incremental-compute-cache)](https://pypi.org/project/trysac-incremental-compute-cache/)
-[![License: MIT](https://img.shields.io/pypi/l/trysac-incremental-compute-cache)](LICENSE)
-[![CI](https://github.com/Trysac/u901-incremental-compute-cache/actions/workflows/ci.yml/badge.svg)](https://github.com/Trysac/u901-incremental-compute-cache/actions/workflows/ci.yml)
-
-Memoised function graph with a persistent cache invalidated by code and input hashes, recomputing only the dependents of what changed
+Memoised function graph with a persistent cache invalidated by code and input hashes, recomputing only the dependents of what changed.
 
 ## Problem
 
-Describe in two or three sentences the concrete problem this utility solves, who hits it, and what
-they do today without it. Replace this paragraph when the first real feature lands.
+Data scripts and notebooks recompute expensive steps after every edit, or cache them by hand and serve stale results when the code changes. Plain memoisation ignores code changes and dependencies between functions. This library records which cached call used which other calls, fingerprints code and arguments, and recomputes only what a change can affect, with early cutoff when a recomputed value is unchanged.
 
-## Install
+## Installation
 
-```sh
-pip install trysac-incremental-compute-cache
-# or
-uv add trysac-incremental-compute-cache
+Install via pip:
+
+```bash
+pip install incremental-compute-cache
 ```
-
-Requires Python 3.10 or newer. No runtime dependencies.
 
 ## Usage
 
 ```python
-import incremental_compute_cache
+from incremental_compute_cache import Graph
 
-# normalize() trims surrounding whitespace and lower-cases the text.
-print(incremental_compute_cache.normalize("  Hello World "))  # -> "hello world"
+g = Graph()
 
-# Blank input is rejected explicitly instead of returning an empty string.
-try:
-    incremental_compute_cache.normalize("   ")
-except ValueError as exc:
-    print(f"rejected: {exc}")
+
+@g.node
+def b(x: int) -> int:
+    return x + 1
+
+
+@g.node
+def a(x: int) -> int:
+    return b(x) * 2
+
+
+assert a(3) == 8
 ```
 
-## Documentation
+## Public API
 
-- [Architecture](docs/ARCHITECTURE.md) and [decisions](docs/decisions/)
-- [Testing](docs/TESTING.md) and [security](docs/SECURITY.md)
-- [Project record](docs/PROJECT.md) and [stack](docs/STACK.md)
-- [Changelog](CHANGELOG.md) and [contributing guide](CONTRIBUTING.md)
+- `Graph(store=None, *, max_depth=100, max_value_bytes=16_777_216, on_event=None)`
+- `MemoryStore(max_entries=10_000)`
+- `SqliteStore(path, *, max_entries=100_000)`
+- `Store` (Protocol): `get(key)`, `put(key, entry)`, `touch(key)`
+- `Event(kind, node, key_prefix)` where `kind` is `'hit' | 'miss' | 'not_stored' | 'evicted'`
+- `CacheError(code)` with `code` in `'unhashable_argument' | 'unhashable_value' | 'cycle' | 'depth_exceeded' | 'corrupt_store'`
 
-## License
+### Options & Limits
 
-[MIT](LICENSE) (c) 2026 Miguel Gomez
+- **Allowed types**: `None`, `bool`, `int`, `float`, `str`, `bytes`, `list`, `tuple`, `dict` (str keys).
+- **Serialization**: Type-tagged JSON (no `pickle`).
+- **Cycle Detection**: Prevents recursive calls with identical arguments.
+- **Depth**: Capped at `max_depth`.
+- **Persistence**: `SqliteStore` handles one writer process per file.
+
+## Why not `functools.cache` or `joblib.Memory`?
+
+They ignore dependencies between functions and do not cut off recomputation when an upstream value is unchanged.
+
+## Security
+
+See [docs/SECURITY.md](docs/SECURITY.md).
