@@ -8,10 +8,12 @@ Data scripts and notebooks recompute expensive steps after every edit, or cache 
 
 ## Installation
 
+Not published to PyPI yet. Install it from GitHub:
+
 Install via pip:
 
 ```bash
-pip install incremental-compute-cache
+pip install "git+https://github.com/Trysac/u901-incremental-compute-cache"
 ```
 
 ## Usage
